@@ -4,9 +4,8 @@ A WhatsApp bot that helps calculate the cost of transferring vehicle ownership i
 
 ## 🚀 Tech Stack
 
-- **WhatsApp Integration**: [Kapso AI](https://docs.kapso.ai) - WhatsApp Business API wrapper
+- **WhatsApp Integration**: [Kapso AI](https://kapso.ai) - WhatsApp Business API + Functions (Cloudflare Workers)
 - **Backend & Database**: [Convex](https://convex.dev) - Serverless backend with real-time database
-- **Deployment**: Vercel (for webhook endpoint)
 
 ## 📋 Features
 
@@ -19,7 +18,7 @@ A WhatsApp bot that helps calculate the cost of transferring vehicle ownership i
 ## 🏗️ Architecture
 
 ```
-User (WhatsApp) → Kapso → Vercel Webhook → Convex API → Response
+User (WhatsApp) → Kapso → Kapso Function (bot.ts) → Convex API → Response
 ```
 
 ## 📊 ITP Tax Rates by Region (2026)
@@ -73,6 +72,7 @@ npx convex dev
 This will:
 - Create a new Convex project
 - Set up the database schema
+- Generate the `_generated` types
 - Start a local dev server
 
 ### 3. Seed the Database
@@ -84,35 +84,45 @@ curl -X POST https://<your-convex-site>.convex.site/api/seed
 
 This populates the database with 45 mock vehicles.
 
-### 4. Configure Environment Variables
+### 4. Configure Kapso
 
-Create a `.env` file:
-
-```bash
-# Kapso AI (from https://kapso.ai dashboard)
-KAPSO_API_KEY=your_kapso_api_key
-
-# Convex (auto-populated by convex dev)
-CONVEX_SITE_URL=https://your-project.convex.site
-```
-
-### 5. Deploy to Vercel
+#### 4.1 Install Kapso CLI
 
 ```bash
-npm i -g vercel
-vercel
+npm install -g kapso
 ```
 
-Set the environment variables in Vercel dashboard:
-- `KAPSO_API_KEY`
-- `CONVEX_SITE_URL`
+#### 4.2 Login to Kapso
 
-### 6. Configure Kapso Webhook
+```bash
+kapso login
+# Enter your API key from https://kapso.ai/dashboard
+```
 
-In your Kapso dashboard, set the webhook URL to:
+#### 4.3 Set up Function Secrets
+
+Deploy the function first (it will fail without secrets, but creates the function):
+
+```bash
+kapso functions push bot.ts
 ```
-https://your-vercel-app.vercel.app/webhook
-```
+
+Then add secrets in the Kapso dashboard (Functions → bot → Secrets tab):
+
+| Secret | Value |
+|--------|-------|
+| `CONVEX_SITE_URL` | `https://your-project.convex.site` |
+| `KAPSO_API_KEY` | Your Kapso API key (optional, for sending replies) |
+
+### 5. Configure WhatsApp Webhook
+
+In your Kapso dashboard:
+1. Go to your WhatsApp number settings
+2. Set the webhook URL to your deployed function:
+   ```
+   https://your-function.kapso.workers.dev
+   ```
+3. Select events: `whatsapp.message.received`
 
 ## 💡 How to Use
 
@@ -134,9 +144,8 @@ https://your-vercel-app.vercel.app/webhook
 
 ```
 User: Hola
-Bot: 🚗 CALCULADORA DE TRANSFERENCIA DE COCHES
-     
-     ¿Qué marca de coche te interesa?
+Bot: 👋 ¡Hola! Bienvenido a la Calculadora de Transferencia de Coches.
+     Te ayudo a calcular el ITP para vehículos de segunda mano en España.
 
 User: Toyota
 Bot: ✅ Marca: TOYOTA
@@ -177,22 +186,31 @@ car-transfer-bot/
 ├── convex/
 │   ├── schema.ts      # Database schema
 │   ├── cars.ts        # Queries, mutations, and tax calculation logic
-│   └── http.ts        # HTTP actions for Kapso integration
-├── bot.ts             # Kapso WhatsApp bot logic
-├── vercel.json        # Vercel deployment config
-├── package.json
+│   └── http.ts        # HTTP actions for external API
+├── bot.ts             # Kapso Function - WhatsApp bot handler
+├── package.json       # Dependencies
+├── tsconfig.json      # TypeScript config
 └── README.md
 ```
 
 ## 🧪 Development
 
-Run locally:
-```bash
-# Terminal 1: Start Convex dev server
-npx convex dev
+### Type Check
 
-# Terminal 2: Start Vercel dev server  
-vercel dev
+```bash
+npm run typecheck
+```
+
+### Update Kapso Function
+
+```bash
+kapso functions push bot.ts
+```
+
+### View Function Logs
+
+```bash
+kapso functions logs bot
 ```
 
 ## 📝 Adding Real Car Data
@@ -212,7 +230,6 @@ Example car record:
   fiscalPower: 12,        // CV (Caballos Fiscales)
   fiscalValue: 18000,     // Valor fiscal en euros (from BOE tables)
   fuelType: "hybrid"      // gasoline | diesel | electric | hybrid
-}
 }
 ```
 
