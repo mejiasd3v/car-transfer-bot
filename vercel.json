@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "bot.ts", "use": "@vercel/node" }
+  ],
+  "routes": [
+    { "src": "/webhook", "dest": "/bot.ts" }
+  ],
+  "env": {
+    "KAPSO_API_KEY": "@kapso-api-key",
+    "CONVEX_SITE_URL": "@convex-site-url"
+  }
+}

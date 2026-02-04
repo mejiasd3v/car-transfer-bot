@@ -1,0 +1,18 @@
+{
+  "name": "car-transfer-bot",
+  "version": "1.0.0",
+  "description": "WhatsApp bot for calculating Spanish car transfer costs using Kapso and Convex",
+  "main": "index.js",
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "setup": "convex dev --once"
+  },
+  "dependencies": {
+    "@kapso/ai": "^1.0.0",
+    "convex": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

@@ -1,0 +1,6 @@
+# Convex Configuration
+
+[visit]
+
+# Deployment used by `convex dev` and `convex deploy`
+deployment = "car-transfer-bot"
