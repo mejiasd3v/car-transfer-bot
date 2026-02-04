@@ -14,12 +14,45 @@ A WhatsApp bot that helps calculate the cost of transferring vehicle ownership i
 - 💰 Calculate transfer tax based on Spanish autonomous community
 - 📊 Shows fiscal value and tax rates
 - 🇪🇸 Supports all Spanish regions with their specific tax rates
+- ⚡ Handles special cases (high-power vehicles, resident discounts)
 
 ## 🏗️ Architecture
 
 ```
 User (WhatsApp) → Kapso → Vercel Webhook → Convex API → Response
 ```
+
+## 📊 ITP Tax Rates by Region (2026)
+
+| Rank | Region | Tax Rate | Notes |
+|------|--------|----------|-------|
+| 🥇 | Galicia | **3%** | Reduced in 2024 |
+| 🥈 | Andalucía | **4%** | 8% if >15 CV |
+| 🥈 | Aragón | **4%** | Fixed fees if >10 years old |
+| 🥈 | Asturias | **4%** | 8% if >15 CV |
+| 🥈 | Baleares | **4%** | 8% if >15 CV, ciclomotores exempt |
+| 🥈 | La Rioja | **4%** | - |
+| 🥈 | Madrid | **4%** | - |
+| 🥈 | Murcia | **4%** | Fixed fees if >12 years old |
+| 🥈 | Navarra | **4%** | - |
+| 🥈 | País Vasco | **4%** | - |
+| 🥈 | Ceuta | **4%** (2% residents) | 50% discount for residents |
+| 🥈 | Melilla | **4%** (2% residents) | 50% discount for residents |
+| - | Castilla y León | **5%** | 8% if >15 CV |
+| - | Cataluña | **5%** | Exempt if >10 years & <€40k |
+| - | Canarias | **5.5%** | - |
+| - | Castilla-La Mancha | **6%** | - |
+| - | Comunidad Valenciana | **6%** | 8% if >2000cc |
+| - | Extremadura | **6%** | - |
+| ⚠️ | Cantabria | **8%** | Most expensive |
+
+### Special Cases
+
+- **High-power vehicles (>15 CV)**: Andalucía, Asturias, Baleares, Castilla y León apply 8%
+- **Ceuta & Melilla residents**: 50% discount (effectively 2%)
+- **Cataluña**: Vehicles >10 years old with value <€40,000 are exempt
+- **Galicia**: Zero emissions vehicles are exempt
+- **Canarias, Aragón, Murcia, Galicia**: Fixed fees for old vehicles (>10-15 years)
 
 ## 🛠️ Setup Instructions
 
@@ -49,7 +82,7 @@ This will:
 curl -X POST https://<your-convex-site>.convex.site/api/seed
 ```
 
-This populates the database with 20 mock vehicles.
+This populates the database with 45 mock vehicles.
 
 ### 4. Configure Environment Variables
 
@@ -88,51 +121,54 @@ https://your-vercel-app.vercel.app/webhook
 3. **Enter year**: Example: "2020" (or type "saltar" to skip)
 4. **Select model**: Choose from the list
 5. **Enter region**: Select your autonomous community
-6. **Get results**: Receive the calculated transfer tax
+6. **Resident check** (Ceuta/Melilla only): Confirm if you're a resident
+7. **Get results**: Receive the calculated transfer tax
+
+### Commands
+
+- `inicio` / `empezar` - Start a new query
+- `tasas` / `precios` - View all regional tax rates
+- `ayuda` / `help` - Show help message
 
 ### Example Conversation
 
 ```
 User: Hola
-Bot: ¡Hola! ¿Qué marca de coche te interesa?
+Bot: 🚗 CALCULADORA DE TRANSFERENCIA DE COCHES
+     
+     ¿Qué marca de coche te interesa?
 
 User: Toyota
 Bot: ✅ Marca: TOYOTA
       ¿De qué año es el vehículo?
 
 User: 2020
-Bot: 🚗 Encontré 3 modelos de TOYOTA del 2020:
+Bot: 🚗 Encontré 4 modelos de TOYOTA del 2020:
       1. Corolla (2020) - 18,000€
       2. Yaris (2020) - 14,000€
-      3. RAV4 (2020) - 28,000€
+      3. RAV4 (2020) - 32,000€
+      4. Land Cruiser (2020) - 55,000€
       
 User: 1
 Bot: 🚗 TOYOTA Corolla (2020)
+      💪 12 CV fiscales
       💰 Valor fiscal: 18,000€
       ¿En qué comunidad autónoma?
-      
+
 User: Madrid
 Bot: 📊 RESULTADO DE LA TRANSFERENCIA
       🚗 Vehículo: TOYOTA Corolla (2020)
+      💪 12 CV fiscales
       💰 Valor fiscal: 18,000€
       📍 Comunidad: Madrid
-      📈 Tipo impositivo: 4%
+      📈 Tipo impositivo: 4.0%
       
+      ━━━━━━━━━━━━━━━━━━━━━━
       💵 IMPUESTO DE TRANSFERENCIAS: 720€
+      ━━━━━━━━━━━━━━━━━━━━━━
+      
+      ⚠️ Este cálculo es orientativo...
 ```
-
-## 📊 Tax Rates by Region
-
-| Region | Tax Rate |
-|--------|----------|
-| Madrid | 4% |
-| Cataluña | 5% |
-| Andalucía | 4% |
-| Comunidad Valenciana | 4% |
-| Canarias | 0% (IGIC applies) |
-| Extremadura | 6% |
-| Cantabria | 5% |
-| Rest of Spain | 4% |
 
 ## 🗂️ Project Structure
 
@@ -140,8 +176,8 @@ Bot: 📊 RESULTADO DE LA TRANSFERENCIA
 car-transfer-bot/
 ├── convex/
 │   ├── schema.ts      # Database schema
-│   ├── cars.ts        # Queries and mutations
-│   └── http.ts        # HTTP actions for Kapso
+│   ├── cars.ts        # Queries, mutations, and tax calculation logic
+│   └── http.ts        # HTTP actions for Kapso integration
 ├── bot.ts             # Kapso WhatsApp bot logic
 ├── vercel.json        # Vercel deployment config
 ├── package.json
@@ -173,11 +209,18 @@ Example car record:
   maker: "toyota",        // lowercase, no spaces
   model: "Corolla",       // exact model name
   year: 2020,             // manufacturing year
-  fiscalPower: 120,       // CV (Caballos Fiscales)
-  fiscalValue: 18000,     // Valor fiscal en euros
+  fiscalPower: 12,        // CV (Caballos Fiscales)
+  fiscalValue: 18000,     // Valor fiscal en euros (from BOE tables)
   fuelType: "hybrid"      // gasoline | diesel | electric | hybrid
 }
+}
 ```
+
+## 🔍 Data Sources
+
+Tax rates verified from:
+- https://www.traficgestion.es/itp-transferencia-vehiculo/
+- https://www.gestoriavehiculos.com/transferencia/
 
 ## 📄 License
 
@@ -189,4 +232,4 @@ Contributions welcome! Please open an issue or PR.
 
 ---
 
-Made with ❤️ in Spain 🇪🇸
+Made with ❤️ in Spain 🇪🇸 | Data updated for 2026
